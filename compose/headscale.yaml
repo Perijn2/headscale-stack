@@ -1,0 +1,53 @@
+# =============================================================================
+# headscale — the coordination control plane
+# =============================================================================
+# The only service in this stack that actually speaks the Tailscale protocol.
+# Everything else either fronts it (caddy) or administers it (headplane).
+#
+#   Config:  ../config/headscale/config.yaml   (git-tracked; edit + restart)
+#   Policy:  ../config/headscale/policy.hujson (ACLs; edit + restart)
+#   State:   ../data/headscale/               (SQLite DB + node keys — BACK UP)
+#
+# Networking: attached ONLY to the internal `controlplane` network. Clients
+# never talk to this container directly — they connect through caddy (443)
+# and headplane's proxy. The one exception is DERP relay traffic (UDP 3478),
+# published directly because Caddy isn't proxying QUIC/UDP in this setup.
+# =============================================================================
+
+services:
+  headscale:
+    image: headscale/headscale:${HEADSCALE_VERSION:?set HEADSCALE_VERSION in .env}
+    container_name: headscale
+    restart: unless-stopped
+    platform: linux/arm64        # Raspberry Pi 3/4/5 on 64-bit Raspberry Pi OS
+    command: serve
+
+    volumes:
+      # --- declarative config (tracked in git) --------------------------------
+      # Mounted read-only on purpose: a compromised container cannot rewrite its
+      # own policy or config. Changes are made in the repo and rolled out with
+      # `docker compose restart headscale`.
+      - ../config/headscale/config.yaml:/etc/headscale/config.yaml:ro
+      - ../config/headscale/policy.hujson:/etc/headscale/policy.hujson:ro
+
+      # --- mutable state -----------------------------------------------------
+      # SQLite DB, node keys, ACL cache. Lives outside the container so it
+      # survives `docker compose down -v`-free lifecycles and can be snapshotted
+      # by scripts/backup.sh. Losing this = re-enrolling every device.
+      - ../data/headscale:/var/lib/headscale
+
+    ports:
+      # DERP relay: clients fall back to this for relayed connections when
+      # direct hole-punching fails. UDP only; not routed through caddy.
+      - "${DERP_PORT:-3478}:3478/udp"
+
+    networks: [controlplane]
+
+    healthcheck:
+      # `headscale status` exits non-zero until the gRPC server answers, so it
+      # doubles as the readiness gate that headplane's depends_on waits for.
+      test: ["CMD", "headscale", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
