@@ -1,0 +1,38 @@
+# =============================================================================
+# headplane.yaml.example — template for the real Headplane config
+# =============================================================================
+# install.sh copies this file to config/headplane/headplane.yaml and replaces:
+#
+#   __DOMAIN__          <- DOMAIN from .env
+#   __SESSION_SECRET__  <- `openssl rand -hex 32` (generated on the Pi)
+#
+# The GENERATED file contains secrets and is git-ignored. This template is the
+# only version-controlled artifact.
+#
+# Verify field names against https://headplane.net/install/docker before the
+# first run — the upstream schema evolves; this tracks the documented shape.
+# =============================================================================
+
+# Public hostname — must match Caddy's cert and headscale's server_url.
+server_name: "__DOMAIN__"
+
+# Serve the dashboard at the site root (https://<DOMAIN>/).
+base_path: /
+
+# Listen inside the container; Caddy reaches us as headplane:3000.
+listen_addr: "0.0.0.0:3000"
+
+# Headplane's own state (sessions, cached API data) — persisted under
+# ../data/headplane so UI logins survive container recreation.
+database:
+  type: sqlite3
+  sqlite3:
+    file: /var/lib/headplane/db.sqlite3
+
+# Where to find the control plane (internal docker DNS name, gRPC port).
+headscale:
+  grpc_addr: "headscale:50051"
+
+# Signs UI session cookies — generated, never committed.
+session:
+  secret: "__SESSION_SECRET__"

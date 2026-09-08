@@ -1,0 +1,43 @@
+# =============================================================================
+# caddy — TLS terminator + HTTP router
+# =============================================================================
+# The ONLY service with published web ports. Two reasons to keep it that way:
+#
+#   * Automatic Let's Encrypt: Caddy proves ownership of ${DOMAIN} on 80/443
+#     and renews certificates by itself — no certbot cron, no manual renewal.
+#     headscale REQUIRES valid TLS for the control plane; Caddy makes that a
+#     non-task.
+#   * Single attack surface: headscale and headplane are never exposed raw.
+#
+# Routing rules live in ../config/caddy/Caddyfile (git-tracked, tiny).
+# =============================================================================
+
+services:
+  caddy:
+    image: caddy:${CADDY_VERSION:?set CADDY_VERSION in .env}
+    container_name: caddy
+    restart: unless-stopped
+
+    # Caddy's {$VAR} syntax in the Caddyfile reads the CONTAINER's environment,
+    # so the two values the Caddyfile needs are passed explicitly here.
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      TLS_EMAIL: ${TLS_EMAIL:?set TLS_EMAIL in .env}
+
+    ports:
+      - "80:80"     # ACME HTTP-01 challenge + redirect to HTTPS
+      - "443:443"   # all TLS traffic: admin UI + coordination proxy
+
+    volumes:
+      # Routing config (tracked in git, read-only).
+      - ../config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+
+      # ACME account key + issued certificates. Losing this means re-issuing
+      # certs from scratch (Let's Encrypt rate limits apply), so it is part of
+      # scripts/backup.sh.
+      - ../data/caddy:/data
+
+    networks: [controlplane]
+
+    depends_on:
+      - headplane   # route target must exist before Caddy starts proxying

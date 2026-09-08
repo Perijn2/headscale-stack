@@ -1,0 +1,48 @@
+# =============================================================================
+# backup — scheduled snapshots (OPT-IN profile)
+# =============================================================================
+# Not started by default. Enable explicitly:
+#
+#   docker compose --profile backup up -d
+#
+# A tiny loop container that runs scripts/backup.sh on an interval and writes
+# tarballs to ../backups/ (git-ignored). Deliberately dumb: no cron daemon,
+# no external scheduler — easy to reason about on a Pi. If you prefer host
+# cron, delete this module and cron scripts/backup.sh on the Pi instead.
+#
+# What gets snapshotted, and why losing each one hurts:
+#   * headscale SQLite DB   — your entire tailnet: users, nodes, preauth keys
+#   * headscale private key — losing it forces EVERY device to re-enroll
+#   * caddy ACME certs      — avoid Let's Encrypt rate limits when restoring
+#   * headplane sessions    — nice-to-have; UI logins survive the restore
+# =============================================================================
+
+services:
+  backup:
+    image: alpine:${ALPINE_VERSION:-3.20}
+    container_name: headscale-backup
+    profiles: [backup]           # opt-in: excluded from a plain `up`
+    restart: unless-stopped      # keep the loop alive across reboots
+
+    environment:
+      # How often to snapshot. Default: once a day.
+      BACKUP_INTERVAL_SECONDS: "${BACKUP_INTERVAL_SECONDS:-86400}"
+
+    command:
+      # $$ escapes Compose interpolation so the CONTAINER's shell reads the
+      # variable. The loop never exits on a failed backup — it logs and retries
+      # on the next tick rather than killing the service.
+      - |
+        while true; do
+          sh /repo/scripts/backup.sh \
+            && echo "[backup] $(date -u +\%FT\%TZ) ok" \
+            || echo "[backup] $(date -u +\%FT\%TZ) FAILED (will retry)"
+          sleep "$$BACKUP_INTERVAL_SECONDS"
+        done
+
+    volumes:
+      # Repo read-only (scripts + config), backups dir writable.
+      - ../:/repo:ro
+      - ../backups:/backups
+
+    networks: [controlplane]     # so backup.sh can `docker exec headscale ...`
