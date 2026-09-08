@@ -1,0 +1,46 @@
+# =============================================================================
+# headscale-stack — Compose entry point
+# =============================================================================
+# This file intentionally contains NO services. It only aggregates the
+# per-service modules under ./compose/ via the `include:` directive, so each
+# concern lives in its own small, reviewable file:
+#
+#   compose/headscale.yaml   control plane (speaks the Tailscale protocol)
+#   compose/headplane.yaml   Tailscale-style admin UI + coordination proxy
+#   compose/caddy.yaml       TLS terminator + router (the only published ports)
+#   compose/backup.yaml      opt-in scheduled snapshots (profile: backup)
+#
+# Usage (from the repo root):
+#   docker compose up -d                        # core stack
+#   docker compose --profile backup up -d       # core stack + backup job
+#
+# Requirements: Docker Compose v2.20+ (for `include:`).
+# Older Compose fallback: set COMPOSE_FILE in .env to a colon-separated list
+# of the modules below; the same relative paths keep working because the first
+# file in the list anchors the project directory.
+#
+# IMPORTANT — path resolution inside included files:
+#   Relative paths in a module resolve against THAT MODULE's own directory
+#   (compose/), not this file's. That is why every module references repo
+#   files as ../config/... and ../data/...
+#   Ref: https://docs.docker.com/compose/how-tos/multiple-compose-files/include/
+# =============================================================================
+
+name: headscale-stack
+
+include:
+  - compose/headscale.yaml
+  - compose/headplane.yaml
+  - compose/caddy.yaml
+  - path: compose/backup.yaml
+    profiles: [backup]
+
+# -----------------------------------------------------------------------------
+# Shared network. All services attach here and talk to each other by service
+# name (headscale:50051, headplane:3000). Nothing else can reach this net —
+# only caddy publishes ports to the outside world.
+# -----------------------------------------------------------------------------
+networks:
+  controlplane:
+    name: controlplane
+    driver: bridge
