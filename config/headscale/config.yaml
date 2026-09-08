@@ -1,0 +1,59 @@
+# =============================================================================
+# headscale configuration — trimmed starting point
+# =============================================================================
+# Deliberately a small subset of the upstream sample. Full annotated reference:
+#   https://github.com/juanfont/headscale/blob/main/config-example.yaml
+#
+# Lines marked `# INSTALL:` are rewritten by install.sh from DOMAIN in .env.
+# After any manual edit:  docker compose restart headscale
+# =============================================================================
+
+# INSTALL: replaced with https://$DOMAIN
+# The URL every Tailscale client is configured to talk to. Must match the
+# certificate Caddy serves, or clients refuse to connect.
+server_url: https://head.example.com
+
+# --- gRPC API (the coordination protocol) -------------------------------------
+# Listens on all interfaces INSIDE the container; only reachable from the
+# internal `controlplane` docker network (see compose/headscale.yaml).
+grpc_listen_addr: 0.0.0.0:50051
+
+# gRPC's own TLS is off: headplane connects over the internal docker network
+# and TLS terminates at Caddy. Revisit with mTLS if you ever flatten networks.
+grpc_allow_insecure: true
+
+# Prometheus metrics — scrape from the LAN; intentionally not published.
+metrics_listen_addr: 0.0.0.0:9090
+
+# --- Database -----------------------------------------------------------------
+# SQLite on a Pi: single-writer is fine at homelab scale, zero admin.
+# The file lives under ../data/headscale and is covered by the backup profile.
+database:
+  type: sqlite3
+  sqlite3:
+    path: /var/lib/headscale/db.sqlite3
+
+# --- DERP (built-in relay server) ----------------------------------------------
+# Relays client traffic when hole-punching fails. UDP 3478 is published
+# directly by compose/headscale.yaml — it does NOT go through Caddy.
+derp:
+  server:
+    enabled: true
+    region_id: 999
+    stun_listen_addr: "0.0.0.0:3478"
+
+# --- DNS ------------------------------------------------------------------------
+# Magic DNS gives every node a friendly name like laptop.home.example.com.
+dns:
+  magic_dns: true
+  # INSTALL: replaced with $DOMAIN
+  base_domain: example.com
+  nameservers:
+    global:
+      - 1.1.1.1
+      - 9.9.9.9
+
+# --- Policy ---------------------------------------------------------------------
+# ACLs live in the human-readable JSON file mounted next to this one.
+policy:
+  path: /etc/headscale/policy.hujson

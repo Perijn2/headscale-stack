@@ -1,0 +1,19 @@
+// =============================================================================
+// headscale ACL policy (HUJSON = JSON with comments)
+// =============================================================================
+// Docs: https://headscale.net/stable/ref/acls/
+//
+// Starting point: allow everything. That is the Tailscale default and fine to
+// get moving — tighten it before the tailnet holds anything important.
+// Example of a tightened rule, for reference:
+//   { "action": "accept", "src": ["tag:server"], "dst": ["tag:db:5432"] }
+// =============================================================================
+{
+	"acls": [
+		{
+			"action": "accept",
+			"src": ["*"],
+			"dst": ["*:*"],
+		},
+	],
+}

@@ -1,0 +1,28 @@
+# =============================================================================
+# Caddyfile — TLS termination + routing
+# =============================================================================
+# {$DOMAIN} and {$TLS_EMAIL} are read from the CONTAINER environment, which
+# compose/caddy.yaml populates from .env.
+#
+# The whole routing table is one rule because headplane owns both surfaces:
+# the admin dashboard AND the coordination-protocol proxy clients log into.
+# =============================================================================
+
+{
+	# ACME account contact: expiry notices + renewal failure alerts.
+	email {$TLS_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Everything goes to headplane:
+	#   /            -> admin dashboard
+	#   coordination -> proxied by headplane to headscale's gRPC
+	#
+	# flush_interval -1: Tailscale's map requests are long-lived streams;
+	# never let Caddy buffer them or clients stall.
+	reverse_proxy headplane:3000 {
+		flush_interval -1
+	}
+}
