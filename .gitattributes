@@ -1,0 +1,12 @@
+# =============================================================================
+# Line-ending policy
+# =============================================================================
+# Shell scripts MUST be LF in the working tree and in the repo: a CRLF before
+# the shebang or inside the script breaks execution on Linux (the Pi).
+# Without this file, a contributor on Windows with core.autocrlf=true gets a
+# CRLF working copy, and anyone committing with autocrlf=false/input can bake
+# CRLF into the blob. eol=lf removes that whole class of failure.
+*.sh text eol=lf
+
+# Everything else: normalize to LF in the repo; working tree follows git default.
+* text=auto

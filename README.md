@@ -31,10 +31,14 @@ config/                  tracked, declarative, human-edited
 data/                    IGNORED — runtime state (sqlite, keys, certs)
 backups/                 IGNORED — snapshot tarballs
 compose/                 the service modules above
+install.sh               host bootstrap: OS detect → deps → secrets → up
+scripts/gen-secrets.sh   fills headplane.yaml template + creates data dirs
+scripts/backup.sh        snapshot data/ + config/ (used by backup profile)
+scripts/restore.sh       restore newest (or named) snapshot
 .env.example             copy to .env on the Pi; all interpolation lives here
 ```
 
-Reinstall story: `git clone` + copy `.env` + `./install.sh` → `scripts/restore.sh`
+Reinstall story: `git clone` + copy `.env` + `sh install.sh` → `sh scripts/restore.sh`
 for the data.
 
 ## Quick start (Raspberry Pi, 64-bit OS)
@@ -42,7 +46,8 @@ for the data.
 ```sh
 git clone <this-repo> && cd headscale-server
 cp .env.example .env        # set DOMAIN, TLS_EMAIL
-./install.sh                # checks arch/docker, generates secrets, composes up
+sh install.sh               # detects OS, installs docker, generates secrets, composes up
+                            # (scripts are POSIX sh — no exec bit needed)
 docker compose --profile backup up -d   # optional: enable nightly snapshots
 ```
 
