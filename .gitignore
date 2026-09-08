@@ -1,0 +1,11 @@
+# --- secrets & generated config (never commit) --------------------------------
+.env
+config/headplane/headplane.yaml
+
+# --- runtime state (lives on the Pi; restore with scripts/restore.sh) ---------
+data/
+backups/
+
+# --- editor / OS noise ---------------------------------------------------------
+.DS_Store
+*.swp
